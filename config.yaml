@@ -1,0 +1,20 @@
+auto_accept: false
+use_google_sheets: false   # เริ่มแบบไม่ใช้ Google Sheets ก่อน
+trades_sheet_name: trades
+positions_sheet_name: positions
+realized_sheet_name: realized
+
+default_quote_assets: ["USDT", "USD", "BTC", "ETH"]
+
+exchange_keywords:
+  binance: ["binance", "ราคา", "price", "filled", "ค่าธรรมเนียม"]
+  mexc: ["mexc", "filled", "fee", "成交", "价格"]
+  pionex: ["pionex", "grid", "dca", "filled", "Fee"]
+
+field_aliases:
+  price: ["price", "ราคา"]
+  qty: ["qty", "amount", "ปริมาณ", "จำนวน"]
+  fee: ["fee", "ค่าธรรมเนียม"]
+  time: ["time", "เวลา", "filled time", "成交时间"]
+
+cost_policy: average_cost
