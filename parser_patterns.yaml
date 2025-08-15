@@ -1,0 +1,36 @@
+pair_patterns:
+  - '(?P<pair>[A-Z]{2,12}/(?:USDT|USD|BTC|ETH))'
+  - '(?P<base>[A-Z]{2,12})(USDT|USD|BTC|ETH)'
+
+side_patterns:
+  - '(?P<side>BUY|SELL)'
+  - '(?P<side>ซื้อ|ขาย)'
+
+price_patterns:
+  - '(ราคา|Price)[:\s]*?(?P<price>[0-9]+[.,][0-9]+)'
+  - 'Price\s*\([A-Z]{2,10}\)\s*(?P<price>[0-9]+[.,]?[0-9]*)'
+  - '(Avg Price|Average|ราคาเฉลี่ย)[:\s]*?(?P<price>[0-9]+[.,][0-9]+)'
+
+qty_patterns:
+  - '(Qty|Amount|ปริมาณ|จำนวน)[:\s]*?(?P<qty>[0-9]+[.,]?[0-9]*)'
+  - 'Filled\s*\([A-Z]{2,10}\)\s*(?P<qty>[0-9]+[.,]?[0-9]*)'
+  - 'Filled[:\s]*?(?P<qty>[0-9]+[.,]?[0-9]*)'
+
+fee_patterns:
+  - '(Fee|ค่าธรรมเนียม)[:\s]*?(?P<fee>[0-9]+[.,]?[0-9]*)\s*(?P<fee_asset>[A-Z]{2,10})?'
+  - 'Fee\s*\((?P<fee_asset>[A-Z]{2,10})\)\s*(?P<fee>[0-9]+[.,]?[0-9]*)'
+
+time_patterns:
+  - '(Time|เวลา|Filled Time)[:\s]*?(?P<time>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})'
+  - '(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})'
+  - '(?P<time>\d{2}:\d{2}:\d{2})'
+
+# หน้าจอ Binance Convert "Successful"
+convert_receive_patterns:
+  - 'You will receive\s*[×x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
+convert_tx_amount_patterns:
+  - 'Transaction Amount\s*(?P<amount>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
+convert_inverse_price_patterns:
+  - 'Inverse Price\s*1\s+(?P<base>[A-Z]{2,10})\s*=\s*(?P<price>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
+convert_direct_price_patterns:
+  - 'Price\s*1\s+(?P<quote>[A-Z]{2,10})\s*=\s*(?P<units>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
