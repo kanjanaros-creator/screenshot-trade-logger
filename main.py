@@ -99,6 +99,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     text = extract_text_from_image(io.BytesIO(img_bytes))
     ex = guess_exchange(text)
     parsed = parse_from_text(text)
+    logger.info("parsed=%s", parsed)
     # ถ้าอ่านไม่ออกเลย
 if not parsed:
     await update.message.reply_text("ยังอ่านข้อมูลจากรูปนี้ไม่ออก ลองถ่ายให้ชัดขึ้นหรือส่งรูปหน้าอื่นนะคะ")
