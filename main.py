@@ -93,17 +93,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not photos:
         await update.message.reply_text("ไม่พบรูปภาพค่ะ")
         return
-    photo = photos[-1]
+        photo = photos[-1]
     bio = await photo.get_file()
     img_bytes = await bio.download_as_bytearray()
     text = extract_text_from_image(io.BytesIO(img_bytes))
     ex = guess_exchange(text)
     parsed = parse_from_text(text)
     logger.info("parsed=%s", parsed)
+
     # ถ้าอ่านไม่ออกเลย
-if not parsed:
-    await update.message.reply_text("ยังอ่านข้อมูลจากรูปนี้ไม่ออก ลองถ่ายให้ชัดขึ้นหรือส่งรูปหน้าอื่นนะคะ")
-    return
+    if not parsed:
+        await update.message.reply_text("ยังอ่านข้อมูลจากรูปนี้ไม่ออก ลองถ่ายให้ชัดขึ้นหรือส่งรูปหน้าอื่นนะคะ")
+        return
 
 # ถ้าเป็นหน้า Wallet → สรุปรายการแล้วรอพิมพ์ ok เพื่อบันทึก
 if parsed["kind"] == "wallet":
