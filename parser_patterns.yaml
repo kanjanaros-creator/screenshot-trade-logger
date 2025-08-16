@@ -38,3 +38,11 @@ convert_inverse_price_patterns:
   - 'Inverse Price\s*1\s+(?P<base>[A-Z]{2,10})\s*=\s*(?P<price>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
 convert_direct_price_patterns:
   - 'Price\s*1\s+(?P<quote>[A-Z]{2,10})\s*=\s*(?P<units>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
+
+# ---- Binance Wallet list ----
+wallet_detector_patterns:
+  - 'Hide assets\s*<\s*1\s*USD'
+
+wallet_row_patterns:
+  # บรรทัดลักษณะ: BTC 0.04841333 $5,695.57
+  - '(?P<asset>[A-Z]{2,10})\s+(?P<qty>[0-9.,]+)\s*(?:\$\s*(?P<usd>[0-9.,]+))?$'
