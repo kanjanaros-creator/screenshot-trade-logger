@@ -132,15 +132,19 @@ def parse_wallet_from_text(text: str):
 
 
 def parse_from_text(text: str):
-    # 1) พยายามตีความเป็น "trade" ก่อน
-    trade = parse_trade_from_text(text)
-    if trade:
-        return {"kind": "trade", "data": trade}
-
-    # 2) ถ้าไม่ใช่ trade ให้ลองตีความเป็น "wallet"
+    # 1) ลองตีความเป็น "wallet" ก่อน
     wallet = parse_wallet_from_text(text)
     if wallet:
         return {"kind": "wallet", "data": wallet}
 
-    # 3) ไม่เข้าเงื่อนไขใดเลย
+    # 2) ถ้าไม่ใช่ wallet ค่อยลองเป็น "trade"
+    trade = parse_trade_from_text(text)
+    if not trade:
+        return None
+
+    # ตัดเคสที่เจอแค่ side (เพราะโดนคำว่า Buy/Sell ล่อ)
+    core = [trade.get("pair"), trade.get("qty"), trade.get("price")]
+    if any(core):
+        return {"kind": "trade", "data": trade}
+
     return None
