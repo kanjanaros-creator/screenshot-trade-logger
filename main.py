@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 from ocr_engine import extract_text_from_image
-from parser_engine import parse_trade_from_text, guess_exchange
+from parser_engine import parse_from_text, guess_exchange
 from storage import TradeStorage
 from pnl import PnLEngine
 from utils import parse_bool
@@ -98,7 +98,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     img_bytes = await bio.download_as_bytearray()
     text = extract_text_from_image(io.BytesIO(img_bytes))
     ex = guess_exchange(text)
-    trade = parse_trade_from_text(text)
+    parsed = parse_from_text(text)
     trade["exchange"] = ex
     trade["src_image_id"] = photo.file_unique_id
     trade["ts_iso"] = datetime.now(timezone.utc).isoformat()
