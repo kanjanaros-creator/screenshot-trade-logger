@@ -66,11 +66,26 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lines.append(f"- {p.get('pair')}: qty={qty:.6f}, avg_cost={avg:.6f}")
     await update.message.reply_text("\n".join(lines))
 
-def _format_preview(trade: Dict[str, Any]) -> str:
+def _format_preview(trade):
     kv = []
-    for k in ["exchange","pair","side","price","qty","fee","fee_asset","time"]:
-        if k in trade and trade[k] is not None:
-            kv.append(f"{k}: {trade[k]}")
+    if trade.get("exchange"):
+        kv.append(f"exchange: {trade['exchange']}")
+    if trade.get("pair"):
+        kv.append(f"pair: {trade['pair']}")
+    if trade.get("side"):
+        kv.append(f"side: {trade['side']}")
+    if trade.get("price") is not None:
+        kv.append(f"price: {fmt(trade['price'])}")
+    if trade.get("qty") is not None:
+        kv.append(f"qty: {fmt(trade['qty'])}")
+    if trade.get("fee") is not None:
+        kv.append(f"fee: {fmt(trade['fee'])}")
+    if trade.get("quote_amount"):
+        qa = fmt(trade['quote_amount'])
+        qas = trade.get("quote_asset") or ""
+        kv.append(f"spent: {qa} {qas}")
+    if trade.get("time"):
+        kv.append(f"time: {trade['time']}")
     return "พบข้อมูลต่อไปนี้ค่ะ:\n" + "\n".join(kv)
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
