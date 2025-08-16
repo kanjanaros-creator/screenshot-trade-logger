@@ -28,6 +28,7 @@ time_patterns:
 # หน้าจอ Binance Convert "Successful"
 convert_receive_patterns:
   - 'You will receive\s*[×x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
+  - 'Receive\s*[+x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
 convert_tx_amount_patterns:
   - 'Transaction Amount\s*(?P<amount>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
 convert_inverse_price_patterns:
