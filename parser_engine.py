@@ -44,6 +44,8 @@ def parse_trade_from_text(text: str) -> Dict[str, Any]:
     base = _first_match(PAT.get("convert_receive_patterns", []), text, "base")
     inv_p = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "price")
     inv_q = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "quote")
+    from_amount = _first_match(PAT.get("convert_from_amount_patterns", []), text, "amount")
+    from_quote  = _first_match(PAT.get("convert_from_amount_patterns", []), text, "quote")
     dir_units = _first_match(PAT.get("convert_direct_price_patterns", []), text, "units")
     dir_quote = _first_match(PAT.get("convert_direct_price_patterns", []), text, "quote")
     tx_quote = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "quote")
@@ -52,27 +54,31 @@ def parse_trade_from_text(text: str) -> Dict[str, Any]:
         price = _num(inv_p)  # 1 BASE = price QUOTE
         quote = inv_q or tx_quote
         return {
-            "pair": _normalize_pair(None, base, quote),
-            "side": "BUY",
-            "price": price,
-            "qty": _num(qty),
-            "fee": 0.0,
-            "fee_asset": None,
-            "time": None,
+    "pair": _normalize_pair(None, base, quote),
+    "side": "BUY",
+    "price": price,
+    "qty": _num(qty),
+    "quote_amount": _num(from_amount or None),  # ✅ จำนวน BTC ที่ใช้
+    "quote_asset":  (from_quote or tx_quote),   # ✅ สกุลที่ใช้ (เช่น BTC)
+    "fee": 0.0,
+    "fee_asset": None,
+    "time": None,
         }
     elif qty and base and dir_units and (dir_quote or tx_quote):
         units = _num(dir_units)
         price = (1.0 / units) if units else None
         quote = dir_quote or tx_quote
         return {
-            "pair": _normalize_pair(None, base, quote),
-            "side": "BUY",
-            "price": price,
-            "qty": _num(qty),
-            "fee": 0.0,
-            "fee_asset": None,
-            "time": None,
-        }
+    "pair": _normalize_pair(None, base, quote),
+    "side": "BUY",
+    "price": price,
+    "qty": _num(qty),
+    "quote_amount": _num(from_amount or None),
+    "quote_asset":  (from_quote or dir_quote or tx_quote),
+    "fee": 0.0,
+    "fee_asset": None,
+    "time": None,
+         }
 
     # 2) Generic single filled
     pair = _first_match(PAT.get("pair_patterns", []), text, "pair")
@@ -83,7 +89,6 @@ def parse_trade_from_text(text: str) -> Dict[str, Any]:
     fee = _first_match(PAT.get("fee_patterns", []), text, "fee")
     fee_asset = _first_match(PAT.get("fee_patterns", []), text, "fee_asset")
     ttime = _first_match(PAT.get("time_patterns", []), text, "time")
-
     side = None
     if side_raw:
         s = side_raw.strip().upper()
