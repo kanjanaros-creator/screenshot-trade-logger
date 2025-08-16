@@ -107,3 +107,38 @@ def parse_trade_from_text(text: str) -> Dict[str, Any]:
         "time": ttime,
     }
     return trade
+    import re
+
+def parse_wallet_from_text(text: str):
+    # ถ้าไม่มีลายเซ็นหน้า wallet ก็เลิก
+    if not _first_match(PAT.get("wallet_detector_patterns", []), text, None):
+        return None
+
+    assets = []
+    for line in [l.strip() for l in text.splitlines() if l.strip()]:
+        for pat in PAT.get("wallet_row_patterns", []):
+            m = re.search(pat, line)
+            if m:
+                sym = m.group('asset')
+                qty = _num(m.group('qty'))
+                usd = _num(m.groupdict().get('usd'))
+                # กันชื่อที่ไม่ใช่เหรียญจริง
+                if sym and sym.isupper() and qty is not None:
+                    assets.append({"asset": sym, "qty": qty, "usd": usd})
+                break
+
+    return {"type": "wallet", "assets": assets} if len(assets) >= 3 else None
+    
+    def parse_from_text(text: str):
+    # 1) พยายามตีความเป็น "trade" ก่อน
+    trade = parse_trade_from_text(text)
+    if trade:
+        return {"kind": "trade", "data": trade}
+
+    # 2) ถ้าไม่ใช่ trade ให้ลองตีความเป็น "wallet"
+    wallet = parse_wallet_from_text(text)
+    if wallet:
+        return {"kind": "wallet", "data": wallet}
+
+    # 3) ไม่เข้าเงื่อนไขอะไรเลย
+    return None
