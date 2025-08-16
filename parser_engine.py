@@ -1,35 +1,104 @@
-pair_patterns:
-  - '(?P<pair>[A-Z]{2,12}/(?:USDT|USD|BTC|ETH))'
-  - '(?P<base>[A-Z]{2,12})(USDT|USD|BTC|ETH)'
+import re
+import yaml
+from typing import Dict, Any
 
-side_patterns:
-  - '(?P<side>BUY|SELL)'
-  - '(?P<side>ซื้อ|ขาย)'
+with open("parser_patterns.yaml", "r", encoding="utf-8") as f:
+    PAT = yaml.safe_load(f)
 
-price_patterns:
-  - '(ราคา|Price)[:\s]*?(?P<price>[0-9]+[.,][0-9]+)'
-  - 'Price\s*\([A-Z]{2,10}\)\s*(?P<price>[0-9]+[.,]?[0-9]*)'
-  - '(Avg Price|Average|ราคาเฉลี่ย)[:\s]*?(?P<price>[0-9]+[.,][0-9]+)'
+with open("config.yaml", "r", encoding="utf-8") as f:
+    CFG = yaml.safe_load(f)
 
-qty_patterns:
-  - '(Qty|Amount|ปริมาณ|จำนวน)[:\s]*?(?P<qty>[0-9]+[.,]?[0-9]*)'
-  - 'Filled\s*\([A-Z]{2,10}\)\s*(?P<qty>[0-9]+[.,]?[0-9]*)'
-  - 'Filled[:\s]*?(?P<qty>[0-9]+[.,]?[0-9]*)'
+def _first_match(patterns, text, group_name):
+    for pat in patterns:
+        m = re.search(pat, text, flags=re.IGNORECASE | re.DOTALL)
+        if m and group_name in m.groupdict() and m.group(group_name):
+            return m.group(group_name)
+    return None
 
-fee_patterns:
-  - '(Fee|ค่าธรรมเนียม)[:\s]*?(?P<fee>[0-9]+[.,]?[0-9]*)\s*(?P<fee_asset>[A-Z]{2,10})?'
-  - 'Fee\s*\((?P<fee_asset>[A-Z]{2,10})\)\s*(?P<fee>[0-9]+[.,]?[0-9]*)'
+def guess_exchange(text: str) -> str:
+    t = text.lower()
+    for ex, keys in (CFG.get("exchange_keywords") or {}).items():
+        if any(k.lower() in t for k in keys):
+            return ex
+    return "unknown"
 
-time_patterns:
-  - '(Time|เวลา|Filled Time)[:\s]*?(?P<time>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})'
-  - '(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})'
-  - '(?P<time>\d{2}:\d{2}:\d{2})'
+def _normalize_pair(text_pair: str, base: str = None, quote: str = None) -> str:
+    if text_pair:
+        up = text_pair.upper().replace(" ", "")
+        if "/" not in up and quote:
+            return f"{up}/{quote.upper()}"
+        return up
+    if base and quote:
+        return f"{base.upper()}/{quote.upper()}"
+    if base:
+        return f"{base.upper()}/USDT"
+    return None
 
-convert_receive_patterns:
-  - 'You will receive\s*[×x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
-convert_tx_amount_patterns:
-  - 'Transaction Amount\s*(?P<amount>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
-convert_inverse_price_patterns:
-  - 'Inverse Price\s*1\s+(?P<base>[A-Z]{2,10})\s*=\s*(?P<price>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
-convert_direct_price_patterns:
-  - 'Price\s*1\s+(?P<quote>[A-Z]{2,10})\s*=\s*(?P<units>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
+def _num(x):
+    if x is None: return None
+    return float(str(x).replace(",", ""))
+
+def parse_trade_from_text(text: str) -> Dict[str, Any]:
+    # 1) Binance Convert "Successful"
+    qty = _first_match(PAT.get("convert_receive_patterns", []), text, "qty")
+    base = _first_match(PAT.get("convert_receive_patterns", []), text, "base")
+    inv_p = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "price")
+    inv_q = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "quote")
+    dir_units = _first_match(PAT.get("convert_direct_price_patterns", []), text, "units")
+    dir_quote = _first_match(PAT.get("convert_direct_price_patterns", []), text, "quote")
+    tx_quote = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "quote")
+
+    if qty and base and (inv_p and (inv_q or tx_quote)):
+        price = _num(inv_p)  # 1 BASE = price QUOTE
+        quote = inv_q or tx_quote
+        return {
+            "pair": _normalize_pair(None, base, quote),
+            "side": "BUY",
+            "price": price,
+            "qty": _num(qty),
+            "fee": 0.0,
+            "fee_asset": None,
+            "time": None,
+        }
+    elif qty and base and dir_units and (dir_quote or tx_quote):
+        units = _num(dir_units)
+        price = (1.0 / units) if units else None
+        quote = dir_quote or tx_quote
+        return {
+            "pair": _normalize_pair(None, base, quote),
+            "side": "BUY",
+            "price": price,
+            "qty": _num(qty),
+            "fee": 0.0,
+            "fee_asset": None,
+            "time": None,
+        }
+
+    # 2) Generic single filled
+    pair = _first_match(PAT.get("pair_patterns", []), text, "pair")
+    base_only = _first_match(PAT.get("pair_patterns", []), text, "base")
+    side_raw = _first_match(PAT.get("side_patterns", []), text, "side")
+    price = _first_match(PAT.get("price_patterns", []), text, "price")
+    qty = qty or _first_match(PAT.get("qty_patterns", []), text, "qty")
+    fee = _first_match(PAT.get("fee_patterns", []), text, "fee")
+    fee_asset = _first_match(PAT.get("fee_patterns", []), text, "fee_asset")
+    ttime = _first_match(PAT.get("time_patterns", []), text, "time")
+
+    side = None
+    if side_raw:
+        s = side_raw.strip().upper()
+        if s in ("BUY", "ซื้อ"):
+            side = "BUY"
+        elif s in ("SELL", "ขาย"):
+            side = "SELL"
+
+    trade = {
+        "pair": _normalize_pair(pair, base_only),
+        "side": side,
+        "price": _num(price),
+        "qty": _num(qty),
+        "fee": _num(fee),
+        "fee_asset": (fee_asset or "").upper() or None,
+        "time": ttime,
+    }
+    return trade
