@@ -129,20 +129,21 @@ if parsed["kind"] == "wallet":
         logger.exception("wallet preview failed")
         await update.message.reply_text(f"มีข้อผิดพลาดตอนพรีวิวพอร์ต: {e}")
     return
-# ถ้าเป็น trade → ตั้งค่า trade แล้วปล่อยให้ไปเข้าบล็อกพรีวิวเดิมด้านล่าง
+
+# ถ้าเป็น trade -> ตั้งค่า trade แล้วปล่อยให้ไปเข้าบล็อกพรีวิว/บันทึก
 trade = parsed["data"]
 trade["exchange"] = trade.get("exchange") or ex
 trade["src_image_id"] = photo.file_unique_id
 trade["ts_iso"] = datetime.now(timezone.utc).isoformat()
 
-    if not AUTO_ACCEPT:
-        preview = _format_preview(trade)
-        preview += "\n\nพิมพ์ 'ok' เพื่อยืนยัน หรือส่งข้อความแก้ไขเป็น JSON (เช่น {\"price\": 0.123})"
-        await update.message.reply_text(preview)
-        context.user_data["pending_trade"] = trade
-    else:
-        result_msg = pnl.record_trade(trade)
-        await update.message.reply_text(result_msg)
+if not AUTO_ACCEPT:
+    preview = _format_preview(trade)
+    preview += "\n\nพิมพ์ 'ok' เพื่อยืนยัน หรือส่งข้อความแก้ไขเป็น JSON (เช่น {\"price\": 0.123})"
+    await update.message.reply_text(preview)
+    context.user_data["pending_trade"] = trade
+else:
+    result_msg = pnl.record_trade(trade)
+    await update.message.reply_text(result_msg)
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = (update.message.text or "").strip()
