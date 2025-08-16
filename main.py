@@ -10,6 +10,14 @@ from parser_engine import parse_trade_from_text, guess_exchange
 from storage import TradeStorage
 from pnl import PnLEngine
 from utils import parse_bool
+from decimal import Decimal, getcontext
+getcontext().prec = 18
+
+def fmt(x):
+    if x is None:
+        return "-"
+    s = format(Decimal(str(x)), "f").rstrip("0").rstrip(".")
+    return s if s else "0"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tradebot")
