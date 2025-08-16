@@ -99,9 +99,29 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     text = extract_text_from_image(io.BytesIO(img_bytes))
     ex = guess_exchange(text)
     parsed = parse_from_text(text)
-    trade["exchange"] = ex
-    trade["src_image_id"] = photo.file_unique_id
-    trade["ts_iso"] = datetime.now(timezone.utc).isoformat()
+    # ถ้าอ่านไม่ออกเลย
+if not parsed:
+    await update.message.reply_text("ยังอ่านข้อมูลจากรูปนี้ไม่ออก ลองถ่ายให้ชัดขึ้นหรือส่งรูปหน้าอื่นนะคะ")
+    return
+
+# ถ้าเป็นหน้า Wallet → สรุปรายการแล้วรอพิมพ์ ok เพื่อบันทึก
+if parsed["kind"] == "wallet":
+    assets = parsed["data"]["assets"]
+    lines = [f"{a['asset']}: {fmt(a['qty'])}" + (f" (${fmt(a['usd'])})" if a.get('usd') else "")
+             for a in assets[:8]]
+    msg = "พบบัญชีพอร์ตค่ะ:\n" + "\n".join(lines)
+    if len(assets) > 8:
+        msg += f"\n… และอีก {len(assets)-8} รายการ"
+    msg += "\n\nพิมพ์ 'ok' เพื่อบันทึกเป็นสแน็ปช็อตล่าสุด"
+    context.user_data["pending_wallet"] = assets
+    await update.message.reply_text(msg)
+    return
+
+# ถ้าเป็น trade → ตั้งค่า trade แล้วปล่อยให้ไปเข้าบล็อกพรีวิวเดิมด้านล่าง
+trade = parsed["data"]
+trade["exchange"] = trade.get("exchange") or ex
+trade["src_image_id"] = photo.file_unique_id
+trade["ts_iso"] = datetime.now(timezone.utc).isoformat()
 
     if not AUTO_ACCEPT:
         preview = _format_preview(trade)
@@ -114,6 +134,19 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     txt = (update.message.text or "").strip()
+pending_trade = context.user_data.get("pending_trade")
+pending_wallet = context.user_data.get("pending_wallet")
+
+# ยืนยันบันทึก "พอร์ต"
+if pending_wallet and txt.lower() in ("ok","โอเค","ตกลง","yes","y"):
+    try:
+        pnl.storage.record_snapshot(pending_wallet)  # เรียกใช้ storage ที่อยู่ใน PnlEngine
+    except Exception as e:
+        await update.message.reply_text(f"บันทึกพอร์ตไม่สำเร็จ: {e}")
+    else:
+        context.user_data["pending_wallet"] = None
+        await update.message.reply_text("บันทึกพอร์ตแล้วค่า ✅")
+    return
     pending = context.user_data.get("pending_trade")
     if pending:
         if txt.lower() in ("ok","โอเค","ตกลง","yes","y"):
