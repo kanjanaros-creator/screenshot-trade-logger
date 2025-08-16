@@ -132,38 +132,42 @@ trade["ts_iso"] = datetime.now(timezone.utc).isoformat()
         result_msg = pnl.record_trade(trade)
         await update.message.reply_text(result_msg)
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = (update.message.text or "").strip()
-pending_trade = context.user_data.get("pending_trade")
-pending_wallet = context.user_data.get("pending_wallet")
+    pending_trade = context.user_data.get("pending_trade")
+    pending_wallet = context.user_data.get("pending_wallet")
 
-# ยืนยันบันทึก "พอร์ต"
-if pending_wallet and txt.lower() in ("ok","โอเค","ตกลง","yes","y"):
-    try:
-        pnl.storage.record_snapshot(pending_wallet)  # เรียกใช้ storage ที่อยู่ใน PnlEngine
-    except Exception as e:
-        await update.message.reply_text(f"บันทึกพอร์ตไม่สำเร็จ: {e}")
-    else:
-        context.user_data["pending_wallet"] = None
-        await update.message.reply_text("บันทึกพอร์ตแล้วค่า ✅")
-    return
-    pending = context.user_data.get("pending_trade")
-    if pending:
-        if txt.lower() in ("ok","โอเค","ตกลง","yes","y"):
-            result_msg = pnl.record_trade(pending)
+    # 1) ยืนยันบันทึก "พอร์ต" (จากหน้า Wallet)
+    if pending_wallet and txt.lower() in ("ok", "โอเค", "ตกลง", "yes", "y"):
+        try:
+            pnl.storage.record_snapshot(pending_wallet)  # ต้องมี record_snapshot ใน storage.py
+        except Exception as e:
+            await update.message.reply_text(f"บันทึกพอร์ตไม่สำเร็จ: {e}")
+        else:
+            context.user_data["pending_wallet"] = None
+            await update.message.reply_text("บันทึกพอร์ตแล้วค่า ✅")
+        return
+
+    # 2) ยืนยันบันทึก "trade"
+    if pending_trade:
+        if txt.lower() in ("ok", "โอเค", "ตกลง", "yes", "y"):
+            result_msg = pnl.record_trade(pending_trade)
             context.user_data["pending_trade"] = None
             await update.message.reply_text(result_msg)
             return
         try:
-            patch = json.loads(txt)
-            pending.update(patch)
-            result_msg = pnl.record_trade(pending)
+            patch = json.loads(txt)       # รองรับพิมพ์แก้ไขเป็น JSON
+            pending_trade.update(patch)
+            result_msg = pnl.record_trade(pending_trade)
             context.user_data["pending_trade"] = None
             await update.message.reply_text(result_msg)
         except Exception:
-            await update.message.reply_text("ไม่เข้าใจข้อความค่ะ ถ้าต้องการยืนยันให้พิมพ์ 'ok' หรือส่งแก้ไขเป็น JSON")
-    else:
-        await update.message.reply_text("ส่งรูปแคปหน้าจอการเทรดมาได้เลยค่ะ (หรือใช้ /start)")
+            await update.message.reply_text("ไม่เข้าใจข้อความที่แก้ไขค่ะ (ต้องเป็น JSON)")
+
+        return
+
+    # ไม่มีอะไร pending
+    await update.message.reply_text("ส่งรูปแคปหน้าการเทรดหรือหน้า Wallet มาได้เลยค่ะ")
 
 def main():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
