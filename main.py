@@ -106,17 +106,28 @@ if not parsed:
 
 # ถ้าเป็นหน้า Wallet → สรุปรายการแล้วรอพิมพ์ ok เพื่อบันทึก
 if parsed["kind"] == "wallet":
-    assets = parsed["data"]["assets"]
-    lines = [f"{a['asset']}: {fmt(a['qty'])}" + (f" (${fmt(a['usd'])})" if a.get('usd') else "")
-             for a in assets[:8]]
-    msg = "พบบัญชีพอร์ตค่ะ:\n" + "\n".join(lines)
-    if len(assets) > 8:
-        msg += f"\n… และอีก {len(assets)-8} รายการ"
-    msg += "\n\nพิมพ์ 'ok' เพื่อบันทึกเป็นสแน็ปช็อตล่าสุด"
-    context.user_data["pending_wallet"] = assets
-    await update.message.reply_text(msg)
-    return
+    try:
+        assets = parsed["data"]["assets"]
+        lines = []
+        for a in assets[:8]:
+            qty = a.get("qty")
+            usd = a.get("usd")           # ใช้ .get ป้องกัน KeyError
+            line = f"{a.get('asset','?')}: {fmt(qty)}"
+            if usd is not None:
+                line += f" (${fmt(usd)})"
+            lines.append(line)
 
+        msg = "พบบัญชีพอร์ตค่ะ:\n" + "\n".join(lines)
+        if len(assets) > 8:
+            msg += f"\n… และอีก {len(assets)-8} รายการ"
+        msg += "\n\nพิมพ์ 'ok' เพื่อบันทึกเป็นสแน็ปช็อตล่าสุด"
+
+        context.user_data["pending_wallet"] = assets
+        await update.message.reply_text(msg)
+    except Exception as e:
+        logger.exception("wallet preview failed")
+        await update.message.reply_text(f"มีข้อผิดพลาดตอนพรีวิวพอร์ต: {e}")
+    return
 # ถ้าเป็น trade → ตั้งค่า trade แล้วปล่อยให้ไปเข้าบล็อกพรีวิวเดิมด้านล่าง
 trade = parsed["data"]
 trade["exchange"] = trade.get("exchange") or ex
