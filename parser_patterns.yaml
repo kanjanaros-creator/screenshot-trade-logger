@@ -31,6 +31,9 @@ convert_receive_patterns:
   - 'Receive\s*[+x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
 convert_tx_amount_patterns:
   - 'Transaction Amount\s*(?P<amount>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
+# จำนวนเหรียญที่ใช้แลก (ฝั่ง QUOTE)
+convert_from_amount_patterns:
+  - 'From\s*(?P<amount>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
 convert_inverse_price_patterns:
   - 'Inverse Price\s*1\s+(?P<base>[A-Z]{2,10})\s*=\s*(?P<price>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
 convert_direct_price_patterns:
