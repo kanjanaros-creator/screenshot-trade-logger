@@ -25,6 +25,17 @@ time_patterns:
   - '(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})'
   - '(?P<time>\d{2}:\d{2}:\d{2})'
 
+# ----- Total (QUOTE) from receipt -----
+total_patterns:
+  # จับจำนวนเงินด้านหลัง Total (BTC) 0.0016906
+  - '(?i)Total\s*\([A-Z]{2,10}\)\s*:?\s*(?P<total>[0-9]+(?:[.,][0-9]*)*)'
+  # เผื่อรูปแบบติดกันไม่มีช่องว่าง
+  - '(?i)Total\([A-Z]{2,10}\)\s*:?\s*(?P<total>[0-9]+(?:[.,][0-9]*)*)'
+
+total_quote_patterns:
+  # จับสกุลในวงเล็บ เช่น (BTC)
+  - '(?i)Total\s*\(\s*(?P<quote>[A-Z]{2,10})\s*\)'
+  - '(?i)Total\(\s*(?P<quote>[A-Z]{2,10})\s*\)'
 # หน้าจอ Binance Convert "Successful"
 convert_receive_patterns:
   - 'You will receive\s*[×x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
