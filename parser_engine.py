@@ -1,81 +1,83 @@
+# parser_engine.py
 import re
 import yaml
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
-# โหลดแพทเทิร์น/คอนฟิก
+# โหลดแพตเทิร์นและ config
 with open("parser_patterns.yaml", "r", encoding="utf-8") as f:
-    PAT = yaml.safe_load(f) or {}
-
+    PAT = yaml.safe_load(f)
 with open("config.yaml", "r", encoding="utf-8") as f:
-    CFG = yaml.safe_load(f) or {}
+    CFG = yaml.safe_load(f)
 
-# ---------------- helpers ----------------
 
-def _first_match(patterns, text: str, group_name: str) -> Optional[str]:
-    """วน regex หลายอันแล้วคืน group ที่เจอแรกสุด"""
+def _first_match(patterns, text: str, group_name: str = None):
+    """คืนค่าจาก regex กลุ่มแรกที่เจอ (แบบ case-insensitive)"""
+    if not text:
+        return None
     for pat in patterns or []:
-        m = re.search(pat, text, flags=re.IGNORECASE)
-        if m and group_name in (m.groupdict() or {}):
-            return m.group(group_name)
+        m = re.search(pat, text, flags=re.IGNORECASE | re.MULTILINE)
+        if not m:
+            continue
+        if group_name:
+            gd = m.groupdict()
+            if group_name in gd and gd[group_name] is not None:
+                return gd[group_name]
+        else:
+            return m.group(0)
     return None
 
 
 def guess_exchange(text: str) -> str:
     t = text.lower()
     for ex, keys in (CFG.get("exchange_keywords") or {}).items():
-        if any((k or "").lower() in t for k in keys or []):
+        if any(k.lower() in t for k in keys):
             return ex
     return "unknown"
 
 
-def _normalize_pair(text_pair: Optional[str],
-                    base: Optional[str] = None,
-                    quote: Optional[str] = None) -> Optional[str]:
-    """แปลงให้เป็นรูป BASE/QUOTE ให้เรียบร้อย"""
+def _normalize_pair(text_pair: str, base_only: str = None, base: str = None, quote: str = None):
+    """จัดรูปแบบ pair ให้เป็น BASE/QUOTE"""
     if text_pair:
         up = text_pair.upper().replace(" ", "")
-        return up if "/" in up else (f"{up}/{(quote or 'USDT').upper()}")
+        if "/" not in up and quote:
+            return f"{up}/{quote.upper()}"
+        return up
     if base and quote:
         return f"{base.upper()}/{quote.upper()}"
-    if base:
-        return f"{base.upper()}/USDT"
+    if base_only and quote:
+        return f"{base_only.upper()}/{quote.upper()}"
+    if base_only:
+        return f"{base_only.upper()}/USDT"
     return None
 
 
-def _num(x) -> Optional[float]:
+def _num(x):
     if x is None:
         return None
     try:
-        return float(str(x).replace(",", "").strip())
+        return float(str(x).replace(",", ""))
     except Exception:
         return None
 
-# ---------------- parsers ----------------
 
-def parse_trade_from_text(text: str) -> Optional[Dict[str, Any]]:
-    """
-    แยกข้อมูล 'trade' จากข้อความ OCR
-    คืน None ถ้าไม่ใช่ trade (เพื่อให้ไปลอง parse wallet ต่อ)
-    """
+def parse_trade_from_text(text: str) -> Dict[str, Any]:
+    """พยายามดึง trade จากข้อความสลิปแลกเหรียญ/เทรด"""
+    # ---------- 1) Binance Convert "Successful" ----------
+    qty = _first_match(PAT.get("convert_receive_patterns", []), text, "qty")
+    base = _first_match(PAT.get("convert_receive_patterns", []), text, "base")
 
-    # 1) เคส Binance Convert "Successful"
-    qty        = _first_match(PAT.get("convert_receive_patterns", []), text, "qty")
-    base       = _first_match(PAT.get("convert_receive_patterns", []), text, "asset")
+    inv_units = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "units")
+    inv_quote = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "quote")
 
-    inv_p      = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "price")
-    inv_q      = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "quote")
+    dir_units = _first_match(PAT.get("convert_direct_price_patterns", []), text, "units")
+    dir_quote = _first_match(PAT.get("convert_direct_price_patterns", []), text, "quote")
 
-    dir_units  = _first_match(PAT.get("convert_direct_price_patterns", []), text, "units")
-    dir_quote  = _first_match(PAT.get("convert_direct_price_patterns", []), text, "quote")
+    tx_amount = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "amount")
+    tx_quote = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "quote")
 
-    tx_quote   = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "quote")
-    from_amt   = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "amount")
-    from_quote = _first_match(PAT.get("convert_tx_amount_patterns", []), text, "quote")
-
-    # inverse price (แอปโชว์ "1 BASE = price QUOTE")
-    if qty and base and inv_p and (inv_q or tx_quote):
-        price = _num(inv_p)
-        quote = inv_q or tx_quote
+    if qty and base and (inv_units and (inv_quote or tx_quote)):
+        price = _num(inv_units)                 # 1 BASE = price QUOTE
+        quote = inv_quote or tx_quote
         return {
             "pair": _normalize_pair(None, base, quote),
             "side": "BUY",
@@ -84,14 +86,9 @@ def parse_trade_from_text(text: str) -> Optional[Dict[str, Any]]:
             "fee": 0.0,
             "fee_asset": None,
             "time": None,
-            # ใช้เป็นยอดที่จ่ายไป/ได้รับฝั่ง QUOTE
-            "quote_amount": _num(from_amt or None),
-            "quote_asset": (from_quote or tx_quote),
         }
-
-    # direct price (แอปโชว์ "1 QUOTE = units BASE")
-    if qty and base and dir_units and (dir_quote or tx_quote):
-        units = _num(dir_units)
+    elif qty and base and dir_units and (dir_quote or tx_quote):
+        units = _num(dir_units)                 # 1 QUOTE = units BASE  -> price = 1/units
         price = (1.0 / units) if units else None
         quote = dir_quote or tx_quote
         return {
@@ -102,24 +99,40 @@ def parse_trade_from_text(text: str) -> Optional[Dict[str, Any]]:
             "fee": 0.0,
             "fee_asset": None,
             "time": None,
-            "quote_amount": _num(from_amt or None),
-            "quote_asset": (from_quote or tx_quote),
         }
 
-    # 2) Generic single filled (เช่น การเทรดคู่ SOL/BTC แบบปกติ)
-    pair       = _first_match(PAT.get("pair_patterns", []),  text, "pair")
-    base_only  = _first_match(PAT.get("pair_patterns", []),  text, "base")
-    side_raw   = _first_match(PAT.get("side_patterns", []),  text, "side")
-    price      = _first_match(PAT.get("price_patterns", []), text, "price")
-    qty        = qty or _first_match(PAT.get("qty_patterns", []),   text, "qty")
-    fee        = _first_match(PAT.get("fee_patterns", []),    text, "fee")
-    fee_asset  = _first_match(PAT.get("fee_patterns", []),    text, "asset")
-    ttime      = _first_match(PAT.get("time_patterns", []),   text, "time")
+    # ---------- 2) Generic single filled (เช่น Easy Buy/Sell Details) ----------
+    pair = _first_match(PAT.get("pair_patterns", []), text, "pair")
+    base_only = _first_match(PAT.get("pair_patterns", []), text, "base")
+    side_raw = _first_match(PAT.get("side_patterns", []), text, "side")
+    price = _first_match(PAT.get("price_patterns", []), text, "price")
+    qty = qty or _first_match(PAT.get("qty_patterns", []), text, "qty")
+    fee = _first_match(PAT.get("fee_patterns", []), text, "fee")
+    fee_asset = _first_match(PAT.get("fee_patterns", []), text, "fee_asset")
+    ttime = _first_match(PAT.get("time_patterns", []), text, "time")
 
-    # Total (QUOTE)
+    # Total (QUOTE) — จำนวนเงินรวมฝั่ง QUOTE และสกุล
     total_amt = _first_match(PAT.get("total_patterns", []), text, "total")
-    total_q   = _first_match(PAT.get("total_quote_patterns", []), text, "quote")
+    total_q = _first_match(PAT.get("total_quote_patterns", []), text, "quote")
 
+    # เผื่อบางสลิปไม่มี price_patterns แต่มี Inverse/Direct
+    if price is None:
+        inv_units = _first_match(PAT.get("convert_inverse_price_patterns", []), text, "units")
+        dir_units = _first_match(PAT.get("convert_direct_price_patterns", []), text, "units")
+        if inv_units:
+            price = _num(inv_units)
+        elif dir_units:
+            u = _num(dir_units)
+            price = (1.0 / u) if u else None
+
+    # ประกอบ pair ถ้ายังไม่ครบ
+    if (pair is None or "/" not in pair) and base_only:
+        qsym = total_q or _first_match(PAT.get("convert_direct_price_patterns", []), text, "quote") \
+               or _first_match(PAT.get("convert_inverse_price_patterns", []), text, "quote")
+        if qsym:
+            pair = f"{base_only}/{qsym}"
+
+    # จัด side
     side = None
     if side_raw:
         s = side_raw.strip().upper()
@@ -137,51 +150,44 @@ def parse_trade_from_text(text: str) -> Optional[Dict[str, Any]]:
         "fee_asset": (fee_asset or "").upper() or None,
         "time": ttime,
         "quote_amount": _num(total_amt),
-        "quote_asset":  (total_q or "").upper() or None,
+        "quote_asset": (total_q or "").upper() or None,
     }
-
-    # ถ้าไม่มีข้อมูลหลัก ๆ เลย ให้คืน None เพื่อไปลอง parse wallet
-    core = any([
-        trade["pair"] is not None,
-        trade["price"] is not None,
-        trade["qty"] is not None,
-        trade["side"] is not None,
-    ])
-    return trade if core else None
+    return trade
 
 
-def parse_wallet_from_text(text: str) -> Optional[Dict[str, Any]]:
-    """แยกหน้า wallet snapshot (รายชื่อเหรียญในพอร์ต)"""
-    # ต้องมี "ตัวบ่งชี้" ว่าเป็นหน้า wallet ก่อน
-    has_wallet = any(re.search(p, text, flags=re.IGNORECASE)
-                     for p in (PAT.get("wallet_detector_patterns") or []))
-    if not has_wallet:
+# ---------------- Wallet parser ----------------
+def parse_wallet_from_text(text: str):
+    # ต้องมีลายเซ็นหน้าวอลเล็ตก่อน
+    if not _first_match(PAT.get("wallet_detector_patterns", []), text, "xx"):
         return None
 
     assets = []
-    for line in (l.strip() for l in text.splitlines() if l.strip()):
-        for pat in PAT.get("wallet_row_patterns", []) or []:
-            m = re.search(pat, line, flags=re.IGNORECASE)
+    for line in (l.strip() for l in text.splitlines()):
+        for pat in PAT.get("wallet_row_patterns", []):
+            m = re.search(pat, line)
             if not m:
                 continue
             sym = m.group("asset")
-            qty = _num(m.group("qty")) if "qty" in m.groupdict() else None
-            usd = _num(m.group("usd")) if "usd" in m.groupdict() else None
+            qty = _num(m.group("qty"))
+            usd = _num(m.groupdict().get("usd"))
+            # กันชื่อที่ไม่ใช่เหรียญจริง และ qty ต้องไม่ None
             if sym and sym.isupper() and qty is not None:
                 assets.append({"asset": sym, "qty": qty, "usd": usd})
                 break
 
-    return {"type": "wallet", "assets": assets} if assets else None
+    return {"type": "wallet", "assets": assets} if len(assets) > 0 else None
 
 
-def parse_from_text(text: str) -> Optional[Dict[str, Any]]:
-    """ตัว dispatch หลัก: ลอง trade ก่อน ถ้าไม่ใช่ค่อยลอง wallet"""
+def parse_from_text(text: str):
+    # 1) ลองเป็น "trade" ก่อน
     trade = parse_trade_from_text(text)
     if trade:
         return {"kind": "trade", "data": trade}
 
+    # 2) ถ้าไม่ใช่ trade → ลองเป็น "wallet"
     wallet = parse_wallet_from_text(text)
     if wallet:
         return {"kind": "wallet", "data": wallet}
 
+    # 3) ไม่เข้าเงื่อนไขใดเลย
     return None
