@@ -117,8 +117,8 @@ def parse_trade_from_text(text: str) -> Optional[Dict[str, Any]]:
     ttime      = _first_match(PAT.get("time_patterns", []),   text, "time")
 
     # Total (QUOTE)
-    total_amt  = _first_match(PAT.get("total_patterns", []),  text, "amount")
-    total_q    = _first_match(PAT.get("total_patterns", []),  text, "quote")
+    total_amt = _first_match(PAT.get("total_patterns", []), text, "total")
+    total_q   = _first_match(PAT.get("total_quote_patterns", []), text, "quote")
 
     side = None
     if side_raw:
@@ -136,8 +136,8 @@ def parse_trade_from_text(text: str) -> Optional[Dict[str, Any]]:
         "fee": _num(fee),
         "fee_asset": (fee_asset or "").upper() or None,
         "time": ttime,
-        "quote_amount": _num(total_amt or None),
-        "quote_asset": total_q,
+        "quote_amount": _num(total_amt),
+        "quote_asset":  (total_q or "").upper() or None,
     }
 
     # ถ้าไม่มีข้อมูลหลัก ๆ เลย ให้คืน None เพื่อไปลอง parse wallet
