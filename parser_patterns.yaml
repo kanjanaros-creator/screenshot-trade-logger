@@ -1,35 +1,68 @@
+# ===== Patterns for generic spot slips =====
 pair_patterns:
-  - '(?P<pair>[A-Z]{2,12}/(?:USDT|USD|BTC|ETH))'
-  - '(?P<base>[A-Z]{2,12})(USDT|USD|BTC|ETH)'
+  # จับทั้งคู่แบบสำเร็จรูป
+  - '(?P<pair>[A-Z]{2,10}/[A-Z]{2,10})'
+  # หรือจับทีละส่วน
+  - '(?P<base>[A-Z]{2,10})/[A-Z]{2,10}'
 
 side_patterns:
-  - '(?P<side>BUY|SELL)'
-  - '(?P<side>ซื้อ|ขาย)'
+  - '(?P<side>BUY|SELL|ซื้อ|ขาย)'
 
 price_patterns:
-  - '(ราคา|Price)[:\s]*?(?P<price>[0-9]+[.,][0-9]+)'
-  - 'Price\s*\([A-Z]{2,10}\)\s*(?P<price>[0-9]+[.,]?[0-9]*)'
-  - '(Avg Price|Average|ราคาเฉลี่ย)[:\s]*?(?P<price>[0-9]+[.,][0-9]+)'
+  # รองรับตัวเลขทศนิยม/วิทยาศาสตร์
+  - '(?i)(ราคา|price)[:\s]*?(?P<price>[0-9][0-9,\.eE-]*)'
+  - '(?i)price\s*\([A-Z]{2,10}\)\s*(?P<price>[0-9][0-9,\.eE-]*)'
 
 qty_patterns:
-  - '(Qty|Amount|ปริมาณ|จำนวน)[:\s]*?(?P<qty>[0-9]+[.,]?[0-9]*)'
-  - 'Filled\s*\([A-Z]{2,10}\)\s*(?P<qty>[0-9]+[.,]?[0-9]*)'
-  - 'Filled[:\s]*?(?P<qty>[0-9]+[.,]?[0-9]*)'
+  - '(?i)(qty|amount|ปริมาณ|จำนวน)[:\s]*?(?P<qty>[0-9][0-9,\.]*)'
+  - '(?i)filled\s*\([A-Z]{2,10}\)\s*(?P<qty>[0-9][0-9,\.]*)'
+  - '(?i)filled[:\s]*?(?P<qty>[0-9][0-9,\.]*)'
 
 fee_patterns:
-  - '(Fee|ค่าธรรมเนียม)[:\s]*?(?P<fee>[0-9]+[.,]?[0-9]*)\s*(?P<fee_asset>[A-Z]{2,10})?'
-  - 'Fee\s*\((?P<fee_asset>[A-Z]{2,10})\)\s*(?P<fee>[0-9]+[.,]?[0-9]*)'
+  - '(?i)(fee|ค่าธรรมเนียม)[:\s]*?(?P<fee>[0-9][0-9,\.]*)'
+  - '(?i)fee\s*\((?P<fee_asset>[A-Z]{2,10})\)\s*(?P<fee>[0-9][0-9,\.]*)'
 
 time_patterns:
-  - '(Time|เวลา|Filled Time)[:\s]*?(?P<time>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})'
   - '(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})'
-  - '(?P<time>\d{2}:\d{2}:\d{2})'
+  - '(?i)(time|เวลา|filled time)[:\s]*(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})'
 
+# สรุปยอดฝั่ง QUOTE จากบรรทัด Total (BTC) 0.0016906
+total_patterns:
+  - '(?i)total\s*\([A-Z]{2,10}\)\s*(?P<total>[0-9][0-9,\.]*)'
+  # เผื่อรูปแบบไม่มีวงเล็บ
+  - '(?i)total[:\s]*?(?P<total>[0-9][0-9,\.]*)'
+
+total_quote_patterns:
+  - '(?i)total\s*\(\s*(?P<quote>[A-Z]{2,10})\s*\)'
+  # เผื่อกรณีท้ายบรรทัดมีสกุล
+  - '(?i)total\s*[0-9][0-9,\.]*\s*(?P<quote>[A-Z]{2,10})'
+
+# ===== Binance Convert slips =====
+# Receive +400 CRV / You will receive +400 CRV
 convert_receive_patterns:
-  - 'You will receive\s*[×x]?\s*(?P<qty>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
-convert_tx_amount_patterns:
-  - 'Transaction Amount\s*(?P<amount>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
+  - '(?i)(you will receive|receive)\s*\+?\s*(?P<qty>[0-9][0-9,\.]*)\s*(?P<base>[A-Z]{2,10})'
+
+# From 0.00296493 BTC  (จำนวนเหรียญฝั่ง QUOTE ที่ถูกใช้แลก)
+convert_from_amount_patterns:
+  - '(?i)from\s*(?P<amount>[0-9][0-9,\.]*)\s*(?P<quote>[A-Z]{2,10})'
+  - '(?i)transaction amount\s*(?P<amount>[0-9][0-9,\.]*)\s*(?P<quote>[A-Z]{2,10})'
+
+# Inverse Price 1 CRV = 0.00000741 BTC
 convert_inverse_price_patterns:
-  - 'Inverse Price\s*1\s+(?P<base>[A-Z]{2,10})\s*=\s*(?P<price>[0-9.,]+)\s*(?P<quote>[A-Z]{2,10})'
+  - '(?i)inverse\s*price\s*1\s*(?P<base>[A-Z]{2,10})\s*=\s*(?P<price>[0-9][0-9,\.eE-]*)\s*(?P<quote>[A-Z]{2,10})'
+
+# Price 1 BTC = 134910.5 CRV  (ได้ units = CRV per 1 BTC)
 convert_direct_price_patterns:
-  - 'Price\s*1\s+(?P<quote>[A-Z]{2,10})\s*=\s*(?P<units>[0-9.,]+)\s+(?P<base>[A-Z]{2,10})'
+  - '(?i)price\s*1\s*(?P<quote>[A-Z]{2,10})\s*=\s*(?P<units>[0-9][0-9,\.eE-]*)\s*[A-Z]{2,10}'
+
+# เช่น Transaction Amount ... (เผื่อใช้อ่าน quote เพิ่ม)
+convert_tx_amount_patterns:
+  - '(?i)transaction amount\s*(?P<amount>[0-9][0-9,\.]*)\s*(?P<quote>[A-Z]{2,10})'
+
+# ===== Wallet list =====
+wallet_detector_patterns:
+  - '(?i)hide assets\s*<\s*1\s*usd'
+
+# บรรทัดรายการเหรียญในหน้า Wallet
+wallet_row_patterns:
+  - '(?P<asset>[A-Z]{2,10})\s+(?P<qty>[0-9][0-9,\.]*)\s*(?:\$?\s*(?P<usd>[0-9][0-9,\.]*))?'
